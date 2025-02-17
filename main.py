@@ -4,6 +4,7 @@ import sys
 from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel
 from PyQt6.QtGui import QPixmap
 import requests
+from math import log2
 from PyQt6.QtCore import Qt
 
 
@@ -13,11 +14,6 @@ class MAPAPI(QMainWindow):
         self.initUI()
 
     def image_maker(self, coords, scale):
-        if scale > 21:
-            scale = 21
-        elif scale <= 0:
-            scale = 1
-        scale = int(scale)
         server_address = 'http://static-maps.yandex.ru/1.x/?'
         ll_spn = f'll={coords}&z={scale}'
         # Готовим запрос.
@@ -48,18 +44,46 @@ class MAPAPI(QMainWindow):
         self.image.resize(600, 600)
         self.image.setPixmap(self.pixmap)
 
-
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_PageUp and self.scale < 21:
             self.scale += 1
         elif event.key() == Qt.Key.Key_PageDown and self.scale > 0:
             self.scale -= 1
-        else:
-            return
+
+        elif event.key() == Qt.Key.Key_Up:
+            cords = self.cords.split(',')
+            step = 10 / (log2(self.scale) * self.scale ** 2.5)
+            cords[1] = str(float(cords[1]) + abs(step))
+            if abs(float(cords[1])) >= 90:
+                return
+            self.cords = ','.join(cords)
+
+        elif event.key() == Qt.Key.Key_Down:
+            cords = self.cords.split(',')
+            step = 10 / (log2(self.scale) * self.scale ** 2.5)
+            cords[1] = str(float(cords[1]) - abs(step))
+            if abs(float(cords[1])) >= 90:
+                return
+            self.cords = ','.join(cords)
+
+        elif event.key() == Qt.Key.Key_Right:
+            cords = self.cords.split(',')
+            step = 10 / (log2(self.scale) * self.scale ** 2.5)
+            cords[0] = str(float(cords[0]) + abs(step))
+            if abs(float(cords[0])) >= 90:
+                return
+            self.cords = ','.join(cords)
+
+        elif event.key() == Qt.Key.Key_Left:
+            cords = self.cords.split(',')
+            step = 10 / (log2(self.scale) * self.scale ** 2.5)
+            cords[0] = str(float(cords[0]) - abs(step))
+            if abs(float(cords[0])) >= 90:
+                return
+            self.cords = ','.join(cords)
 
         self.image_maker(self.cords, self.scale)
         self.image.setPixmap(QPixmap('map.png'))
-
 
     def closeEvent(self, event):
         os.remove("map.png")
