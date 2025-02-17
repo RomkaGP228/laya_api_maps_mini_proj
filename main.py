@@ -1,20 +1,39 @@
 import os
 import sys
 
-
 from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel
 from PyQt6.QtGui import QPixmap
-from data.geocoder import reverse_geocode
 import requests
+
+
 class MAPAPI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.initUI()
 
+    def image_maker(self, coords, scale):
+        server_address = 'http://static-maps.yandex.ru/1.x/?'
+        ll_spn = f'll={coords}&z={scale}'
+        # Готовим запрос.
+
+        map_request = f"{server_address}{ll_spn}&l=map"
+        response = requests.get(map_request)
+
+        if not response:
+            print("Ошибка выполнения запроса:")
+            print(map_request)
+            print("Http статус:", response.status_code, "(", response.reason, ")")
+            sys.exit(1)
+
+        # Запишем полученное изображение в файл.
+        self.map_file = "map.png"
+        with open(self.map_file, "wb") as file:
+            file.write(response.content)
+
     def initUI(self):
         self.screen = [600, 600]
-        self.cords = "37.530966,55.703258"
-        self.scale = 0.002
+        self.cords = "37.588902,55.768677"
+        self.scale = 17
         self.setGeometry(100, 100, *self.screen)
         self.setWindowTitle('MapApi')
         self.image_maker(self.cords, self.scale)
@@ -23,21 +42,10 @@ class MAPAPI(QMainWindow):
         self.image.resize(600, 600)
         self.image.setPixmap(self.pixmap)
 
-    def image_maker(self, coords, scale):
-        toponym = reverse_geocode(coords, scale)
-        toponym_coodrinates = toponym["Point"]["pos"]
-        # Долгота и широта:
-        toponym_longitude, toponym_lattitude = toponym_coodrinates.split(" ")
-        print(toponym_lattitude, toponym_longitude)
-        server_address = 'https://static-maps.yandex.ru/v1?'
-        ll_spn = f"ll={','.join([toponym_longitude, toponym_lattitude])}&spn={str(scale),str(scale)}"
-        map_request = f"{server_address}{ll_spn}&apikey={apikey}"
-        response = requests.get(map_request)
-        self.map_file = f"map.png"
-        with open(self.map_file, "wb") as out_f:
-            out_f.write(response.content)
+
     def closeEvent(self, event):
         os.remove("map.png")
+
 
 def except_hook(cls, exception, traceback):
     sys.excepthook(cls, exception, traceback)
