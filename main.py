@@ -14,6 +14,7 @@ class MAPAPI(QMainWindow):
         self.initUI()
         uic.loadUi('data/main.ui', self)  # Ensure 'data/main.ui' exists
         self.theme_button.clicked.connect(self.theme_method)
+        self.finder_button.clicked.connect(self.finder)
 
     def initUI(self):
         self.cords = "37.588902,55.768677"
@@ -27,20 +28,17 @@ class MAPAPI(QMainWindow):
         # Ensure the main window has focus to capture key events
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-    def image_maker(self, coords, scale, theme_color):
+    def image_maker(self, coords, scale, theme_color, pt=None):
         server_address = "https://static-maps.yandex.ru/v1?"
         self.params = {'ll': coords,
                        'z': scale,
                        'l': 'map',
                        'apikey': "f3a0fe3a-b07e-4840-a1da-06f18b2ddf13",
-                       'theme': theme_color}
-        ll_spn = f'll={coords}&z={scale}'
-        map_request = f"{server_address}{ll_spn}&l=map"
+                       'theme': theme_color,
+                       'pt': pt}
         response = requests.get(server_address, self.params)
 
         if not response:
-            print("Ошибка выполнения запроса:")
-            print(map_request)
             print("Http статус:", response.status_code, "(", response.reason, ")")
             sys.exit(1)
 
@@ -57,6 +55,19 @@ class MAPAPI(QMainWindow):
             self.theme_button.setText('Темная тема')
         print('goaal')
         self.image_maker(self.cords, self.scale, self.theme_color)
+        self.image.setPixmap(QPixmap('map.png'))
+
+    def finder(self):
+        geocoder_address = "http://geocode-maps.yandex.ru/1.x/"
+        geocoder_params = {
+            "apikey": "8013b162-6b42-4997-9691-77b7074026e0",
+            "geocode": self.finder_line.text(),
+            "format": "json"}
+        response = requests.get(geocoder_address, geocoder_params)
+        json_response = response.json()
+        toponym = json_response["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
+        self.cords = ','.join(list(map(str, toponym["Point"]["pos"].split(" "))))
+        self.image_maker(self.cords, self.scale, self.theme_color, pt=self.cords)
         self.image.setPixmap(QPixmap('map.png'))
 
     def keyPressEvent(self, event):
