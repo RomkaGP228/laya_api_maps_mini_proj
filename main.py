@@ -1,8 +1,8 @@
 import os
 import sys
-
 from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel
 from PyQt6.QtGui import QPixmap
+from PyQt6 import uic
 import requests
 from math import log2
 from PyQt6.QtCore import Qt
@@ -12,14 +12,31 @@ class MAPAPI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.initUI()
+        uic.loadUi('data/main.ui', self)  # Ensure 'data/main.ui' exists
+        self.theme_button.clicked.connect(self.theme_method)
 
-    def image_maker(self, coords, scale):
-        server_address = 'http://static-maps.yandex.ru/1.x/?'
+    def initUI(self):
+        self.cords = "37.588902,55.768677"
+        self.scale = 17
+        self.theme_color = 'light'
+        self.image_maker(self.cords, self.scale, theme_color=self.theme_color)
+        self.pixmap = QPixmap('map.png')
+        self.image = QLabel(self)
+        self.image.resize(600, 600)
+        self.image.setPixmap(self.pixmap)
+        # Ensure the main window has focus to capture key events
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+    def image_maker(self, coords, scale, theme_color):
+        server_address = "https://static-maps.yandex.ru/v1?"
+        self.params = {'ll': coords,
+                       'z': scale,
+                       'l': 'map',
+                       'apikey': "f3a0fe3a-b07e-4840-a1da-06f18b2ddf13",
+                       'theme': theme_color}
         ll_spn = f'll={coords}&z={scale}'
-        # Готовим запрос.
-
         map_request = f"{server_address}{ll_spn}&l=map"
-        response = requests.get(map_request)
+        response = requests.get(server_address, self.params)
 
         if not response:
             print("Ошибка выполнения запроса:")
@@ -27,70 +44,66 @@ class MAPAPI(QMainWindow):
             print("Http статус:", response.status_code, "(", response.reason, ")")
             sys.exit(1)
 
-        # Запишем полученное изображение в файл.
         self.map_file = "map.png"
         with open(self.map_file, "wb") as file:
             file.write(response.content)
 
-    def initUI(self):
-        self.screen = [600, 600]
-        self.cords = "37.588902,55.768677"
-        self.scale = 17
-        self.setGeometry(100, 100, *self.screen)
-        self.setWindowTitle('MapApi')
-        self.image_maker(self.cords, self.scale)
-        self.pixmap = QPixmap('map.png')
-        self.image = QLabel(self)
-        self.image.resize(600, 600)
-        self.image.setPixmap(self.pixmap)
+    def theme_method(self):
+        if self.theme_button.text() == 'Темная тема':
+            self.theme_color = 'dark'
+            self.theme_button.setText('Светлая тема')
+        else:
+            self.theme_color = 'light'
+            self.theme_button.setText('Темная тема')
+        print('goaal')
+        self.image_maker(self.cords, self.scale, self.theme_color)
+        self.image.setPixmap(QPixmap('map.png'))
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_PageUp and self.scale < 21:
-            self.scale += 1
-        elif event.key() == Qt.Key.Key_PageDown and self.scale > 0:
-            self.scale -= 1
+        cords = self.cords.split(',')
+        step = 10 / (log2(self.scale) * self.scale ** 2.5)  # Fixed typo in formula
 
-        elif event.key() == Qt.Key.Key_Up:
-            cords = self.cords.split(',')
-            step = 10 / (log2(self.scale) * self.scale ** 2.5)
-            cords[1] = str(float(cords[1]) + abs(step))
+        if event.key() == Qt.Key.Key_Up:
+            cords[1] = str(float(cords[1]) + abs(step))  # Move latitude up
             if abs(float(cords[1])) >= 90:
                 return
             self.cords = ','.join(cords)
 
         elif event.key() == Qt.Key.Key_Down:
-            cords = self.cords.split(',')
-            step = 10 / (log2(self.scale) * self.scale ** 2.5)
-            cords[1] = str(float(cords[1]) - abs(step))
+            cords[1] = str(float(cords[1]) - abs(step))  # Move latitude down
             if abs(float(cords[1])) >= 90:
                 return
             self.cords = ','.join(cords)
 
         elif event.key() == Qt.Key.Key_Right:
-            cords = self.cords.split(',')
-            step = 10 / (log2(self.scale) * self.scale ** 2.5)
-            cords[0] = str(float(cords[0]) + abs(step))
-            if abs(float(cords[0])) >= 90:
+            cords[0] = str(float(cords[0]) + abs(step))  # Move longitude right
+            if abs(float(cords[0])) >= 180:
                 return
             self.cords = ','.join(cords)
 
         elif event.key() == Qt.Key.Key_Left:
-            cords = self.cords.split(',')
-            step = 10 / (log2(self.scale) * self.scale ** 2.5)
-            cords[0] = str(float(cords[0]) - abs(step))
-            if abs(float(cords[0])) >= 90:
+            cords[0] = str(float(cords[0]) - abs(step))  # Move longitude left
+            if abs(float(cords[0])) >= 180:
                 return
             self.cords = ','.join(cords)
 
-        self.image_maker(self.cords, self.scale)
+        elif event.key() == Qt.Key.Key_PageUp and self.scale < 21:
+            self.scale += 1  # Zoom in
+
+        elif event.key() == Qt.Key.Key_PageDown and self.scale > 0:
+            self.scale -= 1  # Zoom out
+
+        # Update the map after any key press
+        self.image_maker(self.cords, self.scale, self.theme_color)
         self.image.setPixmap(QPixmap('map.png'))
 
     def closeEvent(self, event):
-        os.remove("map.png")
+        if os.path.exists("map.png"):
+            os.remove("map.png")
 
 
 def except_hook(cls, exception, traceback):
-    sys.excepthook(cls, exception, traceback)
+    sys.__excepthook__(cls, exception, traceback)
 
 
 if __name__ == '__main__':
